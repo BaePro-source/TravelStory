@@ -1,7 +1,7 @@
 // src/screens/LoginScreen.tsx
 // 로그인 화면 - Google 로그인
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,14 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { auth } from '../config/firebase';
-import { signInAnonymously } from 'firebase/auth';
+import { auth, WEB_CLIENT_ID } from '../config/firebase';
+import { 
+  signInAnonymously, 
+  GoogleAuthProvider, 
+  signInWithCredential, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { theme } from '../styles/theme';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,14 +27,35 @@ type LoginScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
 
-export default function LoginScreen({ navigation: _navigation }: LoginScreenProps) {
-
+export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
+
+  // Google Sign-In 설정 및 인증 상태 감지
+  useEffect(() => {
+    // Google Sign-In 설정
+    GoogleSignin.configure({
+      webClientId: WEB_CLIENT_ID,
+    });
+
+    // 인증 상태 감지
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (user) {
+      setLoading(false);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    }
+  });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const handleAnonymousLogin = async () => {
     setLoading(true);
     try {
-      await signInAnonymously(auth());
+      await signInAnonymously(auth);
+      console.log('익명 로그인 성공!');
       // onAuthStateChanged가 자동으로 감지하여 Home으로 이동됨
     } catch (error: any) {
       console.error('익명 로그인 실패:', error);
@@ -38,11 +65,32 @@ export default function LoginScreen({ navigation: _navigation }: LoginScreenProp
   };
 
   const handleGoogleLogin = async () => {
-    Alert.alert(
-      '안내',
-      'Google 로그인은 추후 구현 예정입니다.\n현재는 익명 로그인으로 시작해주세요.',
-      [{ text: '확인' }]
-    );
+    setLoading(true);
+    try {
+      // Google Play Services 확인
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      
+      // Google 로그인 시작
+      const signInResult = await GoogleSignin.signIn();
+      
+      // idToken 안전하게 추출
+      const idToken = signInResult.data?.idToken;
+
+      if (!idToken) {
+        throw new Error('ID Token을 가져오지 못했습니다.');
+      }
+
+      // Firebase 인증
+      const credential = GoogleAuthProvider.credential(idToken);
+      await signInWithCredential(auth, credential);
+
+      console.log('Google 로그인 성공!');
+      // onAuthStateChanged가 자동으로 감지하여 Home으로 이동됨
+    } catch (error: any) {
+      console.error('Google 로그인 실패:', error);
+      Alert.alert('오류', `Google 로그인에 실패했습니다: ${error.message}`);
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -65,21 +113,21 @@ export default function LoginScreen({ navigation: _navigation }: LoginScreenProp
         {/* 로그인 버튼 영역 */}
         <View style={styles.buttonSection}>
           <TouchableOpacity
+            style={styles.googleButton}
+            onPress={handleGoogleLogin}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.googleIcon}>G</Text>
+            <Text style={styles.googleButtonText}>Google로 시작하기</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.anonymousButton}
             onPress={handleAnonymousLogin}
             activeOpacity={0.8}
           >
             <Text style={styles.anonymousIcon}>🎭</Text>
             <Text style={styles.anonymousButtonText}>익명으로 시작하기</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.googleButton}
-            onPress={handleGoogleLogin}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.googleIcon}>G</Text>
-            <Text style={styles.googleButtonText}>Google로 시작하기 (준비중)</Text>
           </TouchableOpacity>
 
           <Text style={styles.privacy}>
@@ -126,26 +174,28 @@ const styles = StyleSheet.create({
   buttonSection: {
     paddingBottom: theme.spacing.xl,
   },
-  anonymousButton: {
+  googleButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.primary,
+    backgroundColor: '#4285F4',
     paddingVertical: theme.spacing.md,
     borderRadius: theme.borderRadius.medium,
     marginBottom: theme.spacing.md,
     ...theme.shadows.medium,
   },
-  anonymousIcon: {
+  googleIcon: {
     fontSize: 24,
     marginRight: theme.spacing.sm,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
-  anonymousButtonText: {
+  googleButtonText: {
     fontSize: theme.fontSize.medium,
     fontWeight: 'bold',
-    color: theme.colors.textDark,
+    color: '#FFFFFF',
   },
-  googleButton: {
+  anonymousButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -154,15 +204,14 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.medium,
     marginBottom: theme.spacing.lg,
     ...theme.shadows.soft,
-    opacity: 0.6,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
   },
-  googleIcon: {
+  anonymousIcon: {
     fontSize: 24,
     marginRight: theme.spacing.sm,
-    fontWeight: 'bold',
-    color: theme.colors.primary,
   },
-  googleButtonText: {
+  anonymousButtonText: {
     fontSize: theme.fontSize.medium,
     fontWeight: '600',
     color: theme.colors.text,
