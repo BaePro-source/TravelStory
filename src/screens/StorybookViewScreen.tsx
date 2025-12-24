@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   SafeAreaView,
   Image,
 } from 'react-native';
-import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../navigation/AppNavigator';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {Storybook} from '../types';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { Storybook } from '../types';
+
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type StorybookViewRouteProp = RouteProp<RootStackParamList, 'StorybookView'>;
@@ -20,7 +22,7 @@ type StorybookViewRouteProp = RouteProp<RootStackParamList, 'StorybookView'>;
 const StorybookViewScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<StorybookViewRouteProp>();
-  const {storybookId} = route.params;
+  const { storybookId } = route.params;
 
   const [storybook, setStorybook] = useState<Storybook | null>(null);
 
@@ -29,19 +31,17 @@ const StorybookViewScreen = () => {
   }, []);
 
   const loadStorybook = async () => {
+    if (!storybookId) return;
     try {
-      const stored = await AsyncStorage.getItem('storybooks');
-      if (stored) {
-        const storybooks: Storybook[] = JSON.parse(stored);
-        const found = storybooks.find(s => s.id === storybookId);
-        if (found) {
-          setStorybook(found);
-        }
+      const storybookDoc = await getDoc(doc(db(), 'storybooks', storybookId));
+      if (storybookDoc.exists()) {
+        setStorybook({ id: storybookDoc.id, ...storybookDoc.data() } as Storybook);
       }
     } catch (error) {
       console.error('Failed to load storybook:', error);
     }
   };
+
 
   if (!storybook) {
     return (
@@ -60,13 +60,13 @@ const StorybookViewScreen = () => {
           <Text style={styles.backButton}>← 뒤로</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>스토리북</Text>
-        <View style={{width: 50}} />
+        <View style={{ width: 50 }} />
       </View>
 
       <ScrollView style={styles.content}>
         {storybook.coverImage && (
           <Image
-            source={{uri: storybook.coverImage}}
+            source={{ uri: storybook.coverImage }}
             style={styles.coverImage}
           />
         )}

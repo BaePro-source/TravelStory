@@ -1,16 +1,18 @@
-import React from 'react';
-import {NavigationContainer} from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import React, { useState, useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '../config/firebase';
+
 import HomeScreen from '../screens/HomeScreen';
 import DiaryWriteScreen from '../screens/DiaryWriteScreen';
 import StorybookViewScreen from '../screens/StorybookViewScreen';
+import StoryBookScreen from '../screens/StoryBookScreen';
+import DiaryListScreen from '../screens/DiaryListScreen';
+import LoginScreen from '../screens/LoginScreen';
+import { RootStackParamList } from '../types';
 
-export type RootStackParamList = {
-  Main: undefined;
-  DiaryWrite: {travelId: string};
-  StorybookView: {storybookId: string};
-};
 
 export type MainTabParamList = {
   Home: undefined;
@@ -42,23 +44,53 @@ const MainTabs = () => {
           tabBarLabel: '나의 여행',
         }}
       />
+      <Tab.Screen
+        name="Storybooks"
+        component={StoryBookScreen}
+        options={{
+          tabBarLabel: '스토리북',
+        }}
+      />
     </Tab.Navigator>
   );
 };
 
+
 const AppNavigator = () => {
+  const [initializing, setInitializing] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const subscriber = onAuthStateChanged(auth(), (user) => {
+      setUser(user);
+      if (initializing) setInitializing(false);
+    });
+    return subscriber; // unsubscribe on unmount
+  }, [initializing]);
+
+  if (initializing) return null;
+
   return (
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
         }}>
-        <Stack.Screen name="Main" component={MainTabs} />
-        <Stack.Screen name="DiaryWrite" component={DiaryWriteScreen} />
-        <Stack.Screen name="StorybookView" component={StorybookViewScreen} />
+        {user ? (
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="DiaryList" component={DiaryListScreen} />
+            <Stack.Screen name="DiaryWrite" component={DiaryWriteScreen} />
+            <Stack.Screen name="StorybookView" component={StorybookViewScreen} />
+
+          </>
+        ) : (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        )}
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
+
 
 export default AppNavigator;

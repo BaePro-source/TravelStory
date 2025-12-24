@@ -7,12 +7,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   SafeAreaView,
   Alert,
   ActivityIndicator,
   FlatList,
 } from 'react-native';
+
+
 import { db, auth } from '../config/firebase';
 import {
   collection,
@@ -30,10 +31,30 @@ type StoryBookScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'StoryBook'>;
 };
 
+
+
+const EmptyList = ({ navigation }: { navigation: any }) => (
+  <View style={styles.emptyContainer}>
+    <Text style={styles.emptyIcon}>📝</Text>
+    <Text style={styles.emptyText}>작성된 일기가 없어요</Text>
+    <Text style={styles.emptySubtext}>
+      먼저 여행 일기를 작성해주세요!
+    </Text>
+    <TouchableOpacity
+      style={styles.emptyButton}
+      onPress={() => navigation.navigate('Main')}
+    >
+      <Text style={styles.emptyButtonText}>일기 작성하러 가기</Text>
+    </TouchableOpacity>
+  </View>
+);
+
 export default function StoryBookScreen({ navigation }: StoryBookScreenProps) {
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [selectedDiaries, setSelectedDiaries] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+
 
   useEffect(() => {
     if (!auth().currentUser) return;
@@ -100,9 +121,10 @@ export default function StoryBookScreen({ navigation }: StoryBookScreenProps) {
       setLoading(false);
 
       // 생성된 스토리 화면으로 이동
-      navigation.navigate('StoryView', {
-        story: { id: docRef.id, ...storyData }
+      navigation.navigate('StorybookView', {
+        storybookId: docRef.id
       });
+
     } catch (error) {
       console.error('스토리 생성 실패:', error);
       setLoading(false);
@@ -166,22 +188,6 @@ ${content}
     );
   };
 
-  const EmptyList = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>📝</Text>
-      <Text style={styles.emptyText}>작성된 일기가 없어요</Text>
-      <Text style={styles.emptySubtext}>
-        먼저 여행 일기를 작성해주세요!
-      </Text>
-      <TouchableOpacity
-        style={styles.emptyButton}
-        onPress={() => navigation.navigate('DiaryList')}
-      >
-        <Text style={styles.emptyButtonText}>일기 작성하러 가기</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -196,8 +202,9 @@ ${content}
         renderItem={renderDiaryItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={EmptyList}
+        ListEmptyComponent={<EmptyList navigation={navigation} />}
       />
+
 
       {/* 스토리 생성 버튼 */}
       {diaries.length > 0 && (

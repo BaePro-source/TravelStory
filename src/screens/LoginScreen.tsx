@@ -21,7 +21,8 @@ type LoginScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'Login'>;
 };
 
-export default function LoginScreen({ navigation }: LoginScreenProps) {
+export default function LoginScreen({ navigation: _navigation }: LoginScreenProps) {
+
   const [loading, setLoading] = useState(false);
 
   const handleAnonymousLogin = async () => {

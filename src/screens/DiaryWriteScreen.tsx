@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,15 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import {useNavigation, useRoute, RouteProp} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../navigation/AppNavigator';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {launchImageLibrary} from 'react-native-image-picker';
-import {Travel, DiaryEntry, Photo} from '../types';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types';
+import { doc, getDoc, updateDoc, arrayUnion, setDoc, collection } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage } from '../config/firebase';
+
+import { launchImageLibrary } from 'react-native-image-picker';
+import { Travel, DiaryEntry, Photo } from '../types';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type DiaryWriteRouteProp = RouteProp<RootStackParamList, 'DiaryWrite'>;
@@ -23,7 +26,9 @@ type DiaryWriteRouteProp = RouteProp<RootStackParamList, 'DiaryWrite'>;
 const DiaryWriteScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<DiaryWriteRouteProp>();
-  const {travelId} = route.params;
+
+  const { travelId } = route.params;
+  const user = auth().currentUser;
 
   const [travel, setTravel] = useState<Travel | null>(null);
   const [title, setTitle] = useState('');
@@ -35,20 +40,21 @@ const DiaryWriteScreen = () => {
   }, []);
 
   const loadTravel = async () => {
+    if (!travelId) return;
     try {
-      const stored = await AsyncStorage.getItem('travels');
-      if (stored) {
-        const travels: Travel[] = JSON.parse(stored);
-        const found = travels.find(t => t.id === travelId);
-        if (found) {
-          setTravel(found);
-          setPhotos(found.photos);
-        }
+      const travelDoc = await getDoc(doc(db(), 'travels', travelId));
+      if (travelDoc.exists()) {
+        const data = travelDoc.data() as Travel;
+        // id 중복 지정을 방지하기 위해 data에서 id를 제외하거나 순서를 바꿉니다.
+        setTravel({ ...data, id: travelDoc.id });
+        setPhotos(data.photos || []);
       }
     } catch (error) {
       console.error('Failed to load travel:', error);
     }
   };
+
+
 
   const pickImage = () => {
     launchImageLibrary(
@@ -69,43 +75,77 @@ const DiaryWriteScreen = () => {
     );
   };
 
+  const uploadImages = async (localPhotos: Photo[]): Promise<Photo[]> => {
+    const uploadedPhotos: Photo[] = [];
+
+    for (const photo of localPhotos) {
+      if (photo.uri.startsWith('http')) {
+        uploadedPhotos.push(photo);
+        continue;
+      }
+
+      try {
+        const response = await fetch(photo.uri);
+        const blob = await response.blob();
+        const fileName = photo.id || Date.now().toString();
+        const storageRef = ref(storage(), `photos/${user?.uid}/${fileName}`);
+
+        const snapshot = await uploadBytes(storageRef, blob);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+
+        uploadedPhotos.push({
+          ...photo,
+          uri: downloadURL,
+        });
+      } catch (error) {
+        console.error('Failed to upload image:', error);
+      }
+    }
+
+    return uploadedPhotos;
+  };
+
   const saveDiary = async () => {
     if (!title.trim()) {
       Alert.alert('알림', '제목을 입력해주세요.');
       return;
     }
 
+    if (!travelId) return;
+
     try {
-      const stored = await AsyncStorage.getItem('travels');
-      if (stored) {
-        const travels: Travel[] = JSON.parse(stored);
-        const index = travels.findIndex(t => t.id === travelId);
+      // 1. 이미지 먼저 업로드
+      const uploadedPhotos = await uploadImages(photos);
 
-        if (index !== -1) {
-          const newDiary: DiaryEntry = {
-            id: Date.now().toString(),
-            title,
-            content,
-            date: new Date().toISOString(),
-          };
+      const newDiary: DiaryEntry = {
+        id: Date.now().toString(),
+        title,
+        content,
+        date: new Date().toISOString(),
+      };
 
-          travels[index].diaries.push(newDiary);
-          travels[index].photos = photos;
+      // 2. Firestore 업데이트
+      const travelRef = doc(db(), 'travels', travelId);
+      await updateDoc(travelRef, {
+        diaries: arrayUnion(newDiary),
+        photos: uploadedPhotos, // 모든 사진 정보를 업데이트 (기존 + 새 사진 포함된 상태)
+      });
 
-          await AsyncStorage.setItem('travels', JSON.stringify(travels));
-          Alert.alert('저장 완료', '일기가 저장되었습니다.', [
-            {
-              text: '확인',
-              onPress: () => navigation.goBack(),
-            },
-          ]);
-        }
-      }
+      setPhotos(uploadedPhotos); // 로컬 상태도 업데이트된 URL로 갱신
+
+      Alert.alert('저장 완료', '일기와 사진이 서버에 저장되었습니다.', [
+        {
+          text: '확인',
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     } catch (error) {
       console.error('Failed to save diary:', error);
-      Alert.alert('오류', '일기 저장에 실패했습니다.');
+      Alert.alert('오류', '데이터 저장에 실패했습니다.');
     }
   };
+
+
 
   const generateStorybook = async () => {
     if (!travel) return;
@@ -119,28 +159,25 @@ const DiaryWriteScreen = () => {
     }
 
     try {
-      // 스토리북 생성 로직 (향후 AI API 연동)
       const storybook = {
-        id: Date.now().toString(),
         travelId: travel.id,
         title: `${travel.title}의 이야기`,
         content: generateStorybookContent(travel),
         createdAt: new Date().toISOString(),
-        coverImage: travel.photos[0]?.uri,
+        coverImage: travel.photos[0]?.uri || null,
+        userId: user?.uid,
       };
 
-      const storedStorybooks = await AsyncStorage.getItem('storybooks');
-      const storybooks = storedStorybooks ? JSON.parse(storedStorybooks) : [];
-      storybooks.push(storybook);
-      await AsyncStorage.setItem('storybooks', JSON.stringify(storybooks));
+      const storybookRef = doc(collection(db(), 'storybooks'));
+      await setDoc(storybookRef, storybook);
 
       Alert.alert('생성 완료', '스토리북이 생성되었습니다!', [
         {
           text: '보기',
           onPress: () =>
-            navigation.navigate('StorybookView', {storybookId: storybook.id}),
+            navigation.navigate('StorybookView', { storybookId: storybookRef.id }),
         },
-        {text: '닫기', style: 'cancel'},
+        { text: '닫기', style: 'cancel' },
       ]);
     } catch (error) {
       console.error('Failed to generate storybook:', error);
@@ -148,20 +185,27 @@ const DiaryWriteScreen = () => {
     }
   };
 
+
   const generateStorybookContent = (travelData: Travel): string => {
-    // 간단한 스토리북 생성 (향후 AI로 개선)
-    let story = `# ${travelData.title}의 여행 이야기\n\n`;
+    // AI 스토리텔링 시뮬레이션
+    let story = `# ${travelData.title}\n\n`;
+    story += `이 여행은 ${travelData.startDate}에 시작되었습니다. 당신의 소중한 기록들을 바탕으로 한 편의 이야기를 만들었습니다.\n\n`;
 
     travelData.diaries.forEach((diary, index) => {
-      story += `## ${diary.title}\n`;
+      story += `### ${index + 1}장: ${diary.title}\n`;
       story += `${diary.content}\n\n`;
+
       if (index < travelData.photos.length) {
-        story += `[사진 ${index + 1}]\n\n`;
+        story += `*당시의 풍경이 그려지는 순간입니다.*\n\n`;
       }
     });
 
+    story += `\n---\n*이 이야기는 여행 기록과 사진을 바탕으로 AI가 구성했습니다. 당신의 여행이 이 기록처럼 늘 빛나기를 바랍니다.*`;
+
     return story;
   };
+
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -181,9 +225,13 @@ const DiaryWriteScreen = () => {
           <TextInput
             style={styles.titleInput}
             placeholder="여행의 제목을 입력하세요"
-            value={title}
-            onChangeText={setTitle}
+            defaultValue={title}
+            onChangeText={(text) => {
+              setTitle(text);
+            }}
             placeholderTextColor="#CCCCCC"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
 
@@ -192,13 +240,18 @@ const DiaryWriteScreen = () => {
           <TextInput
             style={styles.contentInput}
             placeholder="오늘 어떤 일이 있었나요?"
-            value={content}
-            onChangeText={setContent}
+            defaultValue={content}
+            onChangeText={(text) => {
+              setContent(text);
+            }}
             multiline
             textAlignVertical="top"
             placeholderTextColor="#CCCCCC"
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
+
 
         <View style={styles.section}>
           <View style={styles.photoHeader}>
@@ -214,7 +267,7 @@ const DiaryWriteScreen = () => {
             {photos.map(photo => (
               <Image
                 key={photo.id}
-                source={{uri: photo.uri}}
+                source={{ uri: photo.uri }}
                 style={styles.photo}
               />
             ))}

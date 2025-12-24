@@ -27,6 +27,16 @@ type DiaryListScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'DiaryList'>;
 };
 
+const EmptyList = () => (
+  <View style={styles.emptyContainer}>
+    <Text style={styles.emptyIcon}>✈️</Text>
+    <Text style={styles.emptyText}>아직 작성한 일기가 없어요</Text>
+    <Text style={styles.emptySubtext}>
+      오늘의 여행을 기록해보세요!
+    </Text>
+  </View>
+);
+
 export default function DiaryListScreen({ navigation }: DiaryListScreenProps) {
   const [diaries, setDiaries] = useState<Diary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,19 +61,10 @@ export default function DiaryListScreen({ navigation }: DiaryListScreenProps) {
   const renderDiaryItem = ({ item }: { item: Diary }) => (
     <DiaryCard
       diary={item}
-      onPress={() => navigation.navigate('DiaryWrite', { diary: item })}
+      onPress={() => navigation.navigate('DiaryWrite', { diaryId: item.id })}
     />
   );
 
-  const EmptyList = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>✈️</Text>
-      <Text style={styles.emptyText}>아직 작성한 일기가 없어요</Text>
-      <Text style={styles.emptySubtext}>
-        오늘의 여행을 기록해보세요!
-      </Text>
-    </View>
-  );
 
   if (loading) {
     return <LoadingSpinner message="일기를 불러오는 중..." />;
@@ -85,6 +86,7 @@ export default function DiaryListScreen({ navigation }: DiaryListScreenProps) {
         onPress={() => navigation.navigate('DiaryWrite', {})}
         activeOpacity={0.8}
       >
+
         <Text style={styles.fabIcon}>✏️</Text>
       </TouchableOpacity>
     </SafeAreaView>

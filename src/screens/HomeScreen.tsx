@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,123 +7,96 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {Travel} from '../types';
-import {useNavigation} from '@react-navigation/native';
-import {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {RootStackParamList} from '../navigation/AppNavigator';
+import { collection, onSnapshot, query, addDoc, orderBy } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
+import { Travel, RootStackParamList } from '../types';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Alert } from 'react-native';
+
+
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+interface TravelCardProps {
+  travel: Travel;
+  onPress: () => void;
+}
+
+const TravelCard = ({ travel, onPress }: TravelCardProps) => {
+  const hasContent = travel.diaries.length > 0 || travel.photos.length > 0;
+
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={0.7}>
+      <View style={styles.cardContent}>
+        <Text style={styles.cardTitle}>{travel.title}</Text>
+        <View style={styles.cardFooter}>
+          <Text style={styles.cardDate}>{travel.startDate}</Text>
+          {hasContent && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>스토리북 생성완료</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 const HomeScreen = () => {
   const [travels, setTravels] = useState<Travel[]>([]);
   const navigation = useNavigation<NavigationProp>();
+  const user = auth().currentUser;
 
   useEffect(() => {
-    loadTravels();
-  }, []);
+    if (!user) return;
 
-  const loadTravels = async () => {
+    const travelsRef = collection(db(), 'travels');
+    const q = query(travelsRef, orderBy('startDate', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const travelsData: Travel[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Travel[];
+      setTravels(travelsData);
+    }, (error) => {
+      console.error('Firestore snapshot error:', error);
+    });
+
+    return unsubscribe;
+  }, [user]);
+
+  const createNewTravel = async () => {
+    if (!user) return;
+
     try {
-      const stored = await AsyncStorage.getItem('travels');
-      if (stored) {
-        setTravels(JSON.parse(stored));
-      } else {
-        // 초기 더미 데이터
-        const dummyTravels: Travel[] = [
-          {
-            id: '1',
-            title: '노르웨이',
-            startDate: '2025.01.02',
-            diaries: [],
-            photos: [],
-          },
-          {
-            id: '2',
-            title: '새로운 여행',
-            startDate: '2025.12.22',
-            diaries: [],
-            photos: [],
-          },
-          {
-            id: '3',
-            title: '새로운 여행',
-            startDate: '2025.12.22',
-            diaries: [],
-            photos: [],
-          },
-          {
-            id: '4',
-            title: '새로운 여행',
-            startDate: '2025.12.22',
-            diaries: [],
-            photos: [],
-          },
-          {
-            id: '5',
-            title: '새로운 여행',
-            startDate: '2025.12.22',
-            diaries: [],
-            photos: [],
-          },
-          {
-            id: '6',
-            title: '새로운 여행',
-            startDate: '2025.12.22',
-            diaries: [],
-            photos: [],
-          },
-        ];
-        setTravels(dummyTravels);
-        await AsyncStorage.setItem('travels', JSON.stringify(dummyTravels));
-      }
+      const newTravel = {
+        title: '새로운 여행',
+        startDate: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+        diaries: [],
+        photos: [],
+        userId: user.uid,
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db(), 'travels'), newTravel);
     } catch (error) {
-      console.error('Failed to load travels:', error);
+      console.error('Failed to create travel:', error);
+      Alert.alert('오류', '새 여행 생성에 실패했습니다.');
     }
   };
 
-  const createNewTravel = async () => {
-    const newTravel: Travel = {
-      id: Date.now().toString(),
-      title: '새로운 여행',
-      startDate: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
-      diaries: [],
-      photos: [],
-    };
-    const updated = [...travels, newTravel];
-    setTravels(updated);
-    await AsyncStorage.setItem('travels', JSON.stringify(updated));
-  };
-
-  const TravelCard = ({travel}: {travel: Travel}) => {
-    const hasContent = travel.diaries.length > 0 || travel.photos.length > 0;
-
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => navigation.navigate('DiaryWrite', {travelId: travel.id})}
-        activeOpacity={0.7}>
-        <View style={styles.cardContent}>
-          <Text style={styles.cardTitle}>{travel.title}</Text>
-          <View style={styles.cardFooter}>
-            <Text style={styles.cardDate}>{travel.startDate}</Text>
-            {hasContent && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>스토리북 생성완료</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.logo}>Travel Story</Text>
         <View style={styles.userSection}>
-          <Text style={styles.userName}>오 은경</Text>
+          <Text style={styles.userName}>{user?.isAnonymous ? '익명 사용자' : user?.displayName || '사용자'}</Text>
         </View>
       </View>
 
@@ -147,7 +120,7 @@ const HomeScreen = () => {
           contentContainerStyle={styles.cardsContainer}
           showsVerticalScrollIndicator={false}>
           {travels.map(travel => (
-            <TravelCard key={travel.id} travel={travel} />
+            <TravelCard key={travel.id} travel={travel} onPress={() => navigation.navigate('DiaryWrite', { travelId: travel.id })} />
           ))}
         </ScrollView>
       </View>

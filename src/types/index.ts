@@ -6,6 +6,20 @@ export interface DiaryEntry {
   location?: string;
 }
 
+// Diary 타입 추가 (Firebase용)
+export interface Diary {
+  id: string;
+  userId: string;
+  travelId?: string;
+  title: string;
+  content: string;
+  date: string;
+  location?: string;
+  photos?: string[];
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
 export interface Photo {
   id: string;
   uri: string;
@@ -29,3 +43,13 @@ export interface Storybook {
   createdAt: string;
   coverImage?: string;
 }
+
+// 네비게이션 타입
+export type RootStackParamList = {
+  Login: undefined;
+  Main: undefined;
+  DiaryList: undefined;
+  DiaryWrite: { travelId?: string; diaryId?: string };
+  StorybookView: { storybookId: string };
+  StoryBook: undefined;
+};
