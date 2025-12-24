@@ -17,9 +17,10 @@ const firebaseConfig = {
 // Firebase 초기화
 const app = initializeApp(firebaseConfig);
 
-// 가급적 기존 코드 수정을 줄이기 위해 함수 형태로 내보냅니다.
-export const auth = () => getAuth(app);
-export const db = () => getFirestore(app);
-export const storage = () => getStorage(app);
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export const WEB_CLIENT_ID = "256919720158-qaubk7eqeflfg0gg8sc1htiu1rcq75kp.apps.googleusercontent.com";
 
 export default { auth, db, storage };
+
