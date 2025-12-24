@@ -13,9 +13,8 @@ import DiaryListScreen from '../screens/DiaryListScreen';
 import LoginScreen from '../screens/LoginScreen';
 import { RootStackParamList } from '../types';
 
-
 export type MainTabParamList = {
-  Home: undefined;
+  HomeTab: undefined;
   Storybooks: undefined;
 };
 
@@ -38,7 +37,7 @@ const MainTabs = () => {
         headerShown: false,
       }}>
       <Tab.Screen
-        name="Home"
+        name="HomeTab"
         component={HomeScreen}
         options={{
           tabBarLabel: '나의 여행',
@@ -55,13 +54,13 @@ const MainTabs = () => {
   );
 };
 
-
 const AppNavigator = () => {
   const [initializing, setInitializing] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const subscriber = onAuthStateChanged(auth(), (user) => {
+    // auth() 대신 auth 사용 (Firebase v9+ 모듈식)
+    const subscriber = onAuthStateChanged(auth, (user) => {
       setUser(user);
       if (initializing) setInitializing(false);
     });
@@ -78,11 +77,11 @@ const AppNavigator = () => {
         }}>
         {user ? (
           <>
-            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Home" component={MainTabs} />
             <Stack.Screen name="DiaryList" component={DiaryListScreen} />
             <Stack.Screen name="DiaryWrite" component={DiaryWriteScreen} />
             <Stack.Screen name="StorybookView" component={StorybookViewScreen} />
-
+            <Stack.Screen name="StoryBook" component={StoryBookScreen} />
           </>
         ) : (
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -91,6 +90,5 @@ const AppNavigator = () => {
     </NavigationContainer>
   );
 };
-
 
 export default AppNavigator;
