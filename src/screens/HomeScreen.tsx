@@ -49,12 +49,13 @@ const TravelCard = ({ travel, onPress }: TravelCardProps) => {
 const HomeScreen = () => {
   const [travels, setTravels] = useState<Travel[]>([]);
   const navigation = useNavigation<NavigationProp>();
-  const user = auth().currentUser;
+  const user = auth.currentUser;
 
   useEffect(() => {
     if (!user) return;
 
-    const travelsRef = collection(db(), 'travels');
+    const travelsRef = collection(db, 'travels');
+
     const q = query(travelsRef, orderBy('startDate', 'desc'));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -83,7 +84,8 @@ const HomeScreen = () => {
         createdAt: new Date().toISOString()
       };
 
-      await addDoc(collection(db(), 'travels'), newTravel);
+      await addDoc(collection(db, 'travels'), newTravel);
+
     } catch (error) {
       console.error('Failed to create travel:', error);
       Alert.alert('오류', '새 여행 생성에 실패했습니다.');
