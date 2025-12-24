@@ -19,6 +19,8 @@ import { db, auth, storage } from '../config/firebase';
 
 import { launchImageLibrary } from 'react-native-image-picker';
 import { Travel, DiaryEntry, Photo } from '../types';
+import { generateAIStory } from '../services/aiService';
+
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type DiaryWriteRouteProp = RouteProp<RootStackParamList, 'DiaryWrite'>;
@@ -28,7 +30,7 @@ const DiaryWriteScreen = () => {
   const route = useRoute<DiaryWriteRouteProp>();
 
   const { travelId } = route.params;
-  const user = auth().currentUser;
+  const user = auth.currentUser;
 
   const [travel, setTravel] = useState<Travel | null>(null);
   const [title, setTitle] = useState('');
@@ -42,7 +44,7 @@ const DiaryWriteScreen = () => {
   const loadTravel = async () => {
     if (!travelId) return;
     try {
-      const travelDoc = await getDoc(doc(db(), 'travels', travelId));
+      const travelDoc = await getDoc(doc(db, 'travels', travelId));
       if (travelDoc.exists()) {
         const data = travelDoc.data() as Travel;
         // id 중복 지정을 방지하기 위해 data에서 id를 제외하거나 순서를 바꿉니다.
@@ -88,7 +90,7 @@ const DiaryWriteScreen = () => {
         const response = await fetch(photo.uri);
         const blob = await response.blob();
         const fileName = photo.id || Date.now().toString();
-        const storageRef = ref(storage(), `photos/${user?.uid}/${fileName}`);
+        const storageRef = ref(storage, `photos/${user?.uid}/${fileName}`);
 
         const snapshot = await uploadBytes(storageRef, blob);
         const downloadURL = await getDownloadURL(snapshot.ref);
@@ -125,7 +127,7 @@ const DiaryWriteScreen = () => {
       };
 
       // 2. Firestore 업데이트
-      const travelRef = doc(db(), 'travels', travelId);
+      const travelRef = doc(db, 'travels', travelId);
       await updateDoc(travelRef, {
         diaries: arrayUnion(newDiary),
         photos: uploadedPhotos, // 모든 사진 정보를 업데이트 (기존 + 새 사진 포함된 상태)
@@ -159,17 +161,21 @@ const DiaryWriteScreen = () => {
     }
 
     try {
+      const contents = travel.diaries.map(d => `${d.title}\n${d.content}`);
+      const aiStory = await generateAIStory(travel.title, contents);
+
       const storybook = {
         travelId: travel.id,
         title: `${travel.title}의 이야기`,
-        content: generateStorybookContent(travel),
+        content: aiStory,
         createdAt: new Date().toISOString(),
         coverImage: travel.photos[0]?.uri || null,
         userId: user?.uid,
       };
 
-      const storybookRef = doc(collection(db(), 'storybooks'));
+      const storybookRef = doc(collection(db, 'storybooks'));
       await setDoc(storybookRef, storybook);
+
 
       Alert.alert('생성 완료', '스토리북이 생성되었습니다!', [
         {
@@ -186,24 +192,7 @@ const DiaryWriteScreen = () => {
   };
 
 
-  const generateStorybookContent = (travelData: Travel): string => {
-    // AI 스토리텔링 시뮬레이션
-    let story = `# ${travelData.title}\n\n`;
-    story += `이 여행은 ${travelData.startDate}에 시작되었습니다. 당신의 소중한 기록들을 바탕으로 한 편의 이야기를 만들었습니다.\n\n`;
 
-    travelData.diaries.forEach((diary, index) => {
-      story += `### ${index + 1}장: ${diary.title}\n`;
-      story += `${diary.content}\n\n`;
-
-      if (index < travelData.photos.length) {
-        story += `*당시의 풍경이 그려지는 순간입니다.*\n\n`;
-      }
-    });
-
-    story += `\n---\n*이 이야기는 여행 기록과 사진을 바탕으로 AI가 구성했습니다. 당신의 여행이 이 기록처럼 늘 빛나기를 바랍니다.*`;
-
-    return story;
-  };
 
 
 
@@ -225,14 +214,14 @@ const DiaryWriteScreen = () => {
           <TextInput
             style={styles.titleInput}
             placeholder="여행의 제목을 입력하세요"
-            defaultValue={title}
-            onChangeText={(text) => {
-              setTitle(text);
-            }}
+            value={title}
+            onChangeText={setTitle}
             placeholderTextColor="#CCCCCC"
             autoCapitalize="none"
             autoCorrect={false}
+            spellCheck={false}
           />
+
         </View>
 
         <View style={styles.section}>
@@ -240,16 +229,16 @@ const DiaryWriteScreen = () => {
           <TextInput
             style={styles.contentInput}
             placeholder="오늘 어떤 일이 있었나요?"
-            defaultValue={content}
-            onChangeText={(text) => {
-              setContent(text);
-            }}
+            value={content}
+            onChangeText={setContent}
             multiline
             textAlignVertical="top"
             placeholderTextColor="#CCCCCC"
             autoCapitalize="none"
             autoCorrect={false}
+            spellCheck={false}
           />
+
         </View>
 
 
