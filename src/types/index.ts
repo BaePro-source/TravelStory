@@ -47,9 +47,31 @@ export interface Storybook {
 // 네비게이션 타입
 export type RootStackParamList = {
   Login: undefined;
-  Main: undefined;
+  Home: undefined;
   DiaryList: undefined;
   DiaryWrite: { travelId?: string; diaryId?: string };
   StorybookView: { storybookId: string };
   StoryBook: undefined;
 };
+
+export interface StorybookPage {
+  page: number;
+  title: string;
+  caption: string;
+  layout: 'full';
+  photoIndex: number[];
+}
+
+export interface StorybookRequest {
+  tripTitle: string;
+  tripDate: string;
+  notes: string;
+  places: string[];
+  people: string[];
+  photoUrls: string[];
+}
+
+export interface StorybookResponse {
+  summary: string;
+  storybook: StorybookPage[];
+}
