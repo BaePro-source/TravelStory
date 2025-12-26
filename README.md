@@ -36,6 +36,16 @@ AI 기반 여행 기록 및 스토리북 생성 앱
 - **환경변수**: react-native-dotenv 3.4.11
 
 ## 시작하기
+  
+  ## 💻 개발 및 테스트 환경
+
+  본 프로젝트는 다음 환경에서 개발 및 테스트되었습니다:
+
+  - **개발 OS**: Windows
+  - **테스트 디바이스**: Android Studio Emulator (Pixel 5, API 33)
+  - **실제 기기**: iOS 디바이스 보유하고 있으나, Windows 환경으로 인해 iOS 테스트 불가
+
+  > 💡 **참고**: macOS가 아닌 Windows 환경에서 개발했기 때문에 iOS 빌드 및 테스트는 진행하지 못했으며, 모든 기능은 Android Studio 에뮬레이터에서 검증되었습니다.
 
 ### 필수 요구사항
 
