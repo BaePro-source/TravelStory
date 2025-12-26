@@ -1,97 +1,180 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# TravelStory
 
-# Getting Started
+AI 기반 여행 기록 및 스토리북 생성 앱
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## 프로젝트 소개
 
-## Step 1: Start Metro
+**TravelStory**는 여행의 추억을 일기와 사진으로 기록하고, Google Gemini AI를 활용하여 감성적인 스토리북으로 자동 생성해주는 React Native 모바일 애플리케이션입니다.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+### 주요 기능
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- **여행 기록 관리**: 여행별로 일기와 사진을 체계적으로 관리
+- **일기 작성**: 제목, 내용, 사진(최대 3장)을 포함한 일기 작성
+- **AI 스토리북 생성**: Gemini AI가 여행 기록을 바탕으로 감성적인 이야기를 자동 생성
+- **Google 로그인**: Google 계정 또는 익명으로 간편하게 로그인
+- **실시간 동기화**: Firebase를 통한 실시간 데이터 동기화
+- **사진 갤러리**: 여행 사진을 아름답게 보여주는 갤러리 뷰
 
-```sh
-# Using npm
+## 기술 스택
+
+### 프레임워크 및 언어
+- **React Native** 0.83.1
+- **TypeScript** 5.8.3
+- **React** 19.2.0
+
+### 백엔드 및 데이터
+- **Firebase** 12.7.0
+  - Authentication (Google 로그인, 익명 로그인)
+  - Firestore (실시간 데이터베이스)
+  - Storage
+- **Google Gemini AI** (2.0 Flash) - 스토리북 생성
+
+### 주요 라이브러리
+- **Navigation**: React Navigation 7.x (Native Stack, Bottom Tabs)
+- **이미지**: react-native-image-picker 8.2.1
+- **날짜**: date-fns 4.1.0
+- **환경변수**: react-native-dotenv 3.4.11
+
+## 시작하기
+
+### 필수 요구사항
+
+- Node.js >= 20
+- React Native 개발 환경 설정 완료
+- Android Studio (Android) 또는 Xcode (iOS)
+
+### 설치 방법
+
+1. 저장소 클론
+```bash
+git clone <https://github.com/BaePro-source/TravelStory.git>
+cd TravelStory
+```
+
+2. 의존성 설치
+```bash
+npm install
+```
+
+3. Android 설정
+
+`android/app` 디렉토리에 `google-services.json` 파일을 추가하세요.
+
+### 실행 방법
+
+#### Metro 번들러 시작
+```bash
+npm start
+```
+
+#### Android 실행
+```bash
+npm run android
+```
+
+## 프로젝트 구조
+
+```
+TravelStory/
+├── src/
+│   ├── components/          # 재사용 가능한 컴포넌트
+│   ├── config/             # Firebase 설정
+│   ├── navigation/         # 네비게이션 구조
+│   ├── screens/            # 화면 컴포넌트
+│   │   ├── LoginScreen.tsx
+│   │   ├── HomeScreen.tsx
+│   │   ├── DiaryWriteScreen.tsx
+│   │   ├── DiaryListScreen.tsx
+│   │   ├── StoryBookScreen.tsx
+│   │   └── StorybookViewScreen.tsx
+│   ├── services/           # 외부 서비스 (AI)
+│   ├── styles/             # 테마 및 스타일
+│   ├── types/              # TypeScript 타입 정의
+│   └── utils/              # 유틸리티 함수
+├── android/                # Android 네이티브 코드
+├── ios/                    # iOS 네이티브 코드
+├── .env                    # 환경 변수 (Git 제외)
+└── App.tsx                 # 앱 진입점
+```
+
+## 주요 화면
+
+### 1. 로그인 화면 (LoginScreen)
+- Google 계정으로 로그인
+- 익명으로 둘러보기
+
+### 2. 홈 화면 (HomeScreen)
+- 여행 목록 확인
+- 새 여행 만들기
+- 여행 삭제
+- 로그아웃
+
+### 3. 일기 작성 화면 (DiaryWriteScreen)
+- 일기 제목 및 내용 작성
+- 사진 업로드 (최대 3장)
+- 이전 일기 기록 확인
+- AI 스토리북 생성
+
+### 4. 스토리북 화면 (StoryBookScreen)
+- 생성된 스토리북 목록
+- 스토리북 보기 및 삭제
+
+### 5. 스토리북 보기 (StorybookViewScreen)
+- 사진 갤러리
+- AI가 생성한 감성적인 여행 이야기
+
+## AI 스토리북 생성
+
+Google Gemini 2.0 Flash API를 사용하여 여행 일기를 감성적인 이야기로 변환합니다.
+
+### 생성 과정
+1. 모든 일기 내용과 사진 개수를 AI에 전달
+2. AI가 여행의 분위기와 감정을 파악
+3. 감성적인 제목과 2-3개의 문단으로 구성된 이야기 생성
+4. 사진에 담긴 순간들을 묘사
+5. 여행의 의미를 담은 마무리 문장 추가
+
+### 특징
+- 사실보다 감정과 분위기에 집중
+- 빛, 공기, 느낌 등 감각적인 표현 사용
+- 사진을 고려한 시각적 묘사 포함
+
+## 보안
+
+모든 API 키와 민감한 정보는 `.env` 파일에 저장되며, Git에는 업로드되지 않습니다.
+
+### 환경 변수 관리
+- `.env` 파일: 로컬 개발용
+- `.gitignore`에 포함되어 Git 추적 제외
+- `react-native-dotenv`를 통해 안전하게 로드
+
+## 개발 스크립트
+
+```bash
+# 개발 서버 시작
 npm start
 
-# OR using Yarn
-yarn start
-```
-
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+# Android 빌드 및 실행
 npm run android
 
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+# iOS 빌드 및 실행
 npm run ios
 
-# OR using Yarn
-yarn ios
+# 린트 검사
+npm run lint
+
+# 테스트 실행
+npm test
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## 라이선스
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+이 프로젝트는 개인 학습 및 포트폴리오 목적으로 제작되었습니다.
 
-## Step 3: Modify your app
+## 기여
 
-Now that you have successfully run the app, let's make changes!
+이 프로젝트는 현재 개인 프로젝트입니다.
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## 연락처
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+프로젝트에 대한 문의사항이 있으시면 이슈를 등록해주세요.
