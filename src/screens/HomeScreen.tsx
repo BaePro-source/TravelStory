@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { collection, onSnapshot, query, addDoc, orderBy, where, deleteDoc, doc, getDocs } from 'firebase/firestore';
-
+import { signOut } from 'firebase/auth';
 
 import { db, auth } from '../config/firebase';
 import { Travel, RootStackParamList } from '../types';
@@ -151,6 +151,29 @@ const HomeScreen = () => {
     );
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      '로그아웃',
+      '정말 로그아웃 하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '로그아웃',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut(auth);
+              Alert.alert('알림', '로그아웃 되었습니다.');
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('오류', '로그아웃에 실패했습니다.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   return (
 
     <SafeAreaView style={styles.container}>
@@ -158,6 +181,9 @@ const HomeScreen = () => {
         <Text style={styles.logo}>Travel Story</Text>
         <View style={styles.userSection}>
           <Text style={styles.userName}>{user?.isAnonymous ? '익명 사용자' : user?.displayName || '사용자'}</Text>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Text style={styles.logoutText}>로그아웃</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -224,6 +250,18 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 13,
     color: '#666666',
+    marginRight: 12,
+  },
+  logoutButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 6,
+  },
+  logoutText: {
+    fontSize: 12,
+    color: '#FF3B30',
+    fontWeight: '600',
   },
   content: {
     flex: 1,
