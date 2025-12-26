@@ -57,6 +57,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       // Google Play Services 확인
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
 
+      // 기존 로그인 세션 초기화 (매번 계정 선택하도록 함)
+      await GoogleSignin.signOut();
+
       // Google 로그인 시작
       const signInResult = await GoogleSignin.signIn();
 
