@@ -23,6 +23,7 @@ export interface Diary {
 export interface Photo {
   id: string;
   uri: string;
+  base64?: string;
   date: string;
 }
 
@@ -42,7 +43,9 @@ export interface Storybook {
   content: string;
   createdAt: string;
   coverImage?: string;
+  photos?: string[];
 }
+
 
 // 네비게이션 타입
 export type RootStackParamList = {
