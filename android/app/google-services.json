@@ -1,0 +1,47 @@
+{
+    "project_info": {
+        "project_number": "256919720158",
+        "project_id": "hb-pro-4d76a",
+        "storage_bucket": "hb-pro-4d76a.firebasestorage.app"
+    },
+    "client": [
+        {
+            "client_info": {
+                "mobilesdk_app_id": "1:256919720158:android:deddddfb39ffae6a9b324f",
+                "android_client_info": {
+                    "package_name": "com.travelstory"
+                }
+            },
+            "oauth_client": [
+                {
+                    "client_id": "256919720158-mqdj551fuhq9bpmdg9rri7fbi23m8sek.apps.googleusercontent.com",
+                    "client_type": 1,
+                    "android_info": {
+                        "package_name": "com.travelstory",
+                        "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+                    }
+                },
+                {
+                    "client_id": "256919720158-qaubk7eqeflfg0gg8sc1htiu1rcq75kp.apps.googleusercontent.com",
+                    "client_type": 3
+                }
+            ],
+            "api_key": [
+                {
+                    "current_key": "AIzaSyADyIRgIfWvNUXDHC6MHMlI8tBQyums-co"
+                }
+            ],
+            "services": {
+                "appinvite_service": {
+                    "other_platform_oauth_client": [
+                        {
+                            "client_id": "256919720158-qaubk7eqeflfg0gg8sc1htiu1rcq75kp.apps.googleusercontent.com",
+                            "client_type": 3
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "configuration_version": "1"
+}
