@@ -15,8 +15,10 @@ import {
   collection,
   query,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  where
 } from 'firebase/firestore';
+
 import { theme } from '../styles/theme';
 import { Diary, RootStackParamList } from '../types';
 import { DiaryCard } from '../components/DiaryCard';
@@ -42,16 +44,26 @@ export default function DiaryListScreen({ navigation }: DiaryListScreenProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!auth().currentUser) return;
+    if (!auth.currentUser) return;
 
     // Firestore에서 실시간으로 일기 목록 가져오기
-    const q = query(collection(db(), 'diaries'), orderBy('createdAt', 'desc'));
+    const q = query(
+      collection(db, 'diaries'),
+      where('userId', '==', auth.currentUser.uid)
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const diaryData: Diary[] = [];
       snapshot.forEach((doc) => {
         diaryData.push({ id: doc.id, ...doc.data() } as Diary);
       });
+
+      // 인덱스 오류 방지를 위해 메모리상에서 정렬
+      diaryData.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+
       setDiaries(diaryData);
+
       setLoading(false);
     });
 

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
+import { Text } from 'react-native';
+
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -41,6 +43,9 @@ const MainTabs = () => {
         component={HomeScreen}
         options={{
           tabBarLabel: '나의 여행',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.5 }}>✈️</Text>
+          ),
         }}
       />
       <Tab.Screen
@@ -48,8 +53,12 @@ const MainTabs = () => {
         component={StoryBookScreen}
         options={{
           tabBarLabel: '스토리북',
+          tabBarIcon: ({ focused }) => (
+            <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.5 }}>✨</Text>
+          ),
         }}
       />
+
     </Tab.Navigator>
   );
 };

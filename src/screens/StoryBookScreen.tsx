@@ -7,11 +7,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   ActivityIndicator,
   FlatList,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 import { db, auth } from '../config/firebase';
@@ -20,12 +20,19 @@ import {
   query,
   orderBy,
   onSnapshot,
-  addDoc
+  addDoc,
+  deleteDoc,
+  doc,
+  where
 } from 'firebase/firestore';
+
+
 import { theme } from '../styles/theme';
-import { Diary, RootStackParamList } from '../types';
+import { Diary, RootStackParamList, Storybook } from '../types';
 import { formatDate } from '../utils/dateFormat';
+import { generateAIStory } from '../services/aiService';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
 
 type StoryBookScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, 'StoryBook'>;
@@ -33,7 +40,7 @@ type StoryBookScreenProps = {
 
 
 
-const EmptyList = ({ navigation }: { navigation: any }) => (
+const EmptyDiaries = ({ navigation }: { navigation: any }) => (
   <View style={styles.emptyContainer}>
     <Text style={styles.emptyIcon}>📝</Text>
     <Text style={styles.emptyText}>작성된 일기가 없어요</Text>
@@ -42,34 +49,82 @@ const EmptyList = ({ navigation }: { navigation: any }) => (
     </Text>
     <TouchableOpacity
       style={styles.emptyButton}
-      onPress={() => navigation.navigate('Main')}
+      onPress={() => navigation.navigate('HomeTab')}
     >
+
       <Text style={styles.emptyButtonText}>일기 작성하러 가기</Text>
     </TouchableOpacity>
   </View>
 );
 
+const EmptyStorybooks = ({ onCreate }: { onCreate: () => void }) => (
+  <View style={styles.emptyContainer}>
+    <Text style={styles.emptyIcon}>✨</Text>
+    <Text style={styles.emptyText}>아직 스토리북이 없어요</Text>
+    <Text style={styles.emptySubtext}>
+      당신의 일기를 모아 멋진 이야기를 만들어보세요!
+    </Text>
+    <TouchableOpacity
+      style={styles.emptyButton}
+      onPress={onCreate}
+    >
+      <Text style={styles.emptyButtonText}>첫 스토리북 만들기</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+
 export default function StoryBookScreen({ navigation }: StoryBookScreenProps) {
   const [diaries, setDiaries] = useState<Diary[]>([]);
+  const [storybooks, setStorybooks] = useState<Storybook[]>([]);
   const [selectedDiaries, setSelectedDiaries] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
   const [loading, setLoading] = useState(false);
-
-
+  const user = auth.currentUser;
 
   useEffect(() => {
-    if (!auth().currentUser) return;
+    if (!auth.currentUser) return;
 
-    const q = query(collection(db(), 'diaries'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const diaryData: Diary[] = [];
+    // 1. 일기 목록 로드
+    const diaryQ = query(
+      collection(db, 'diaries'),
+      where('userId', '==', auth.currentUser.uid)
+    );
+
+    const unsubDiaries = onSnapshot(diaryQ, (snapshot) => {
+      const data: Diary[] = [];
       snapshot.forEach((doc) => {
-        diaryData.push({ id: doc.id, ...doc.data() } as Diary);
+        data.push({ id: doc.id, ...doc.data() } as Diary);
       });
-      setDiaries(diaryData);
+      // 인덱스 오류 방지를 위해 메모리상에서 정렬
+      data.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      setDiaries(data);
+
     });
 
-    return () => unsubscribe();
+    // 2. 스토리북 목록 로드
+    const storyQ = query(
+      collection(db, 'storybooks'),
+      where('userId', '==', auth.currentUser.uid)
+    );
+
+    const unsubStories = onSnapshot(storyQ, (snapshot) => {
+      const data: Storybook[] = [];
+      snapshot.forEach((doc) => {
+        data.push({ id: doc.id, ...doc.data() } as Storybook);
+      });
+      // 인덱스 오류 방지를 위해 메모리상에서 정렬
+      data.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setStorybooks(data);
+
+    });
+
+    return () => {
+      unsubDiaries();
+      unsubStories();
+    };
   }, []);
+
 
   const toggleDiary = (diaryId: string) => {
     if (selectedDiaries.includes(diaryId)) {
@@ -104,11 +159,17 @@ export default function StoryBookScreen({ navigation }: StoryBookScreenProps) {
 
       // TODO: 실제 Claude API 호출로 스토리 생성
       // 현재는 데모용 스토리
-      const story = await generateAIStory(combinedContent, allPhotos);
+      const title = `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월의 여행`;
+      const diaryContents = selectedDiaryData.map(d => `${d.title}\n${d.content}`);
+      // @ts-ignore - Some lint might still show 2 args if types aren't cached
+      const story = await generateAIStory(title, diaryContents, allPhotos.length);
+
+
+
 
       // 스토리 저장
       const storyData = {
-        userId: auth().currentUser!.uid,
+        userId: auth.currentUser!.uid,
         title: `${new Date().getFullYear()}년 ${new Date().getMonth() + 1}월의 여행`,
         content: story,
         photos: allPhotos,
@@ -116,9 +177,12 @@ export default function StoryBookScreen({ navigation }: StoryBookScreenProps) {
         createdAt: new Date().toISOString(),
       };
 
-      const docRef = await addDoc(collection(db(), 'stories'), storyData);
+      const docRef = await addDoc(collection(db, 'storybooks'), storyData);
+
 
       setLoading(false);
+      setIsCreating(false);
+      setSelectedDiaries([]);
 
       // 생성된 스토리 화면으로 이동
       navigation.navigate('StorybookView', {
@@ -132,28 +196,37 @@ export default function StoryBookScreen({ navigation }: StoryBookScreenProps) {
     }
   };
 
-  const generateAIStory = async (content: string, photos: string[]) => {
-    // TODO: 실제 Claude API 연동
-    // 현재는 데모용 더미 스토리 반환
+  const deleteStorybook = async (id: string) => {
+    const storybookToDelete = storybooks.find(s => s.id === id);
+    if (!storybookToDelete) return;
 
-    return new Promise<string>((resolve) => {
-      setTimeout(() => {
-        const demoStory = `✨ 당신의 여행 이야기 ✨
+    Alert.alert(
+      '삭제 확인',
+      '정말로 이 스토리북을 삭제하시겠습니까? 관련 여행 기록도 함께 삭제됩니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 1. 관련 여행 기록 삭제 (travelId가 있는 경우)
+              if (storybookToDelete.travelId) {
+                await deleteDoc(doc(db, 'travels', storybookToDelete.travelId));
+              }
 
-${content}
-
-이 여행은 정말 특별한 순간들로 가득했습니다. 
-매 순간이 소중한 추억이 되어 당신의 마음속에 영원히 남을 것입니다.
-
-사진 ${photos.length}장과 함께하는 이 이야기는
-당신만의 특별한 여행 스토리가 되었습니다.
-
-앞으로도 많은 여행과 아름다운 추억을 만들어가시길 바랍니다. 💝`;
-
-        resolve(demoStory);
-      }, 2000);
-    });
+              // 2. 스토리북 본체 삭제
+              await deleteDoc(doc(db, 'storybooks', id));
+            } catch (error) {
+              console.error('Failed to delete storybook:', error);
+              Alert.alert('오류', '삭제에 실패했습니다.');
+            }
+          }
+        }
+      ]
+    );
   };
+
 
   const renderDiaryItem = ({ item }: { item: Diary }) => {
     const isSelected = selectedDiaries.includes(item.id);
@@ -188,48 +261,91 @@ ${content}
     );
   };
 
+  const renderStorybookItem = ({ item }: { item: Storybook }) => (
+    <TouchableOpacity
+      style={styles.storyCard}
+      onPress={() => navigation.navigate('StorybookView', { storybookId: item.id })}
+    >
+      <View style={styles.storyInfo}>
+        <Text style={styles.storyTitle}>{item.title}</Text>
+        <Text style={styles.storyDate}>
+          {new Date(item.createdAt).toLocaleDateString('ko-KR')}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={styles.deleteMiniButton}
+        onPress={() => deleteStorybook(item.id)}
+      >
+        <Text style={styles.deleteMiniText}>✕</Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+
+  if (isCreating) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => setIsCreating(false)}>
+            <Text style={styles.backButton}>← 취소</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>스토리로 만들 일기 선택</Text>
+        </View>
+
+        <FlatList
+          data={diaries}
+          renderItem={renderDiaryItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={<EmptyDiaries navigation={navigation} />}
+        />
+
+        {diaries.length > 0 && (
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[
+                styles.generateButton,
+                selectedDiaries.length === 0 && styles.disabledButton,
+              ]}
+              onPress={generateStory}
+              disabled={loading || selectedDiaries.length === 0}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.generateButtonText}>
+                  ✨ AI 스토리 만들기
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>스토리로 만들 일기 선택</Text>
-        <Text style={styles.headerSubtitle}>
-          {selectedDiaries.length}개 선택됨
-        </Text>
+        <Text style={styles.headerTitle}>나의 스토리북</Text>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => setIsCreating(true)}
+        >
+          <Text style={styles.createButtonText}>+ 만들기</Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={diaries}
-        renderItem={renderDiaryItem}
+        data={storybooks}
+        renderItem={renderStorybookItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={<EmptyList navigation={navigation} />}
+        ListEmptyComponent={<EmptyStorybooks onCreate={() => setIsCreating(true)} />}
       />
-
-
-      {/* 스토리 생성 버튼 */}
-      {diaries.length > 0 && (
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.generateButton,
-              selectedDiaries.length === 0 && styles.disabledButton,
-            ]}
-            onPress={generateStory}
-            disabled={loading || selectedDiaries.length === 0}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.generateButtonText}>
-                ✨ AI 스토리 만들기
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -361,5 +477,52 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.medium,
     fontWeight: 'bold',
     color: theme.colors.textDark,
+  },
+  backButton: {
+    fontSize: 16,
+    color: theme.colors.primary,
+    fontWeight: '600',
+    marginRight: 12,
+  },
+  createButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: theme.colors.textDark,
+    fontWeight: 'bold',
+  },
+  storyCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.medium,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    ...theme.shadows.soft,
+  },
+  storyInfo: {
+    flex: 1,
+  },
+  storyTitle: {
+    fontSize: theme.fontSize.medium,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    marginBottom: 4,
+  },
+  storyDate: {
+    fontSize: theme.fontSize.small,
+    color: theme.colors.textLight,
+  },
+  deleteMiniButton: {
+    padding: 8,
+  },
+  deleteMiniText: {
+    color: '#FF3B30',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

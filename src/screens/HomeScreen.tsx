@@ -5,9 +5,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
-import { collection, onSnapshot, query, addDoc, orderBy } from 'firebase/firestore';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { collection, onSnapshot, query, addDoc, orderBy, where, deleteDoc, doc, getDocs } from 'firebase/firestore';
+
+
 import { db, auth } from '../config/firebase';
 import { Travel, RootStackParamList } from '../types';
 import { useNavigation } from '@react-navigation/native';
@@ -21,34 +23,46 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 interface TravelCardProps {
   travel: Travel;
   onPress: () => void;
+  onDelete: (id: string) => void;
 }
 
-const TravelCard = ({ travel, onPress }: TravelCardProps) => {
+
+const TravelCard = ({ travel, onPress, onDelete }: TravelCardProps) => {
   const hasContent = travel.diaries.length > 0 || travel.photos.length > 0;
 
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.7}>
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle}>{travel.title}</Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardDate}>{travel.startDate}</Text>
-          {hasContent && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>스토리북 생성완료</Text>
-            </View>
-          )}
+    <View style={styles.cardContainer}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={onPress}
+        activeOpacity={0.7}>
+        <View style={styles.cardContent}>
+          <Text style={styles.cardTitle}>{travel.title}</Text>
+          <View style={styles.cardFooter}>
+            <Text style={styles.cardDate}>{travel.startDate}</Text>
+            {hasContent && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>스토리북 생성완료</Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.deleteIconButton}
+        onPress={() => onDelete(travel.id)}>
+        <Text style={styles.deleteIconText}>✕</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
+
 const HomeScreen = () => {
   const [travels, setTravels] = useState<Travel[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
   const navigation = useNavigation<NavigationProp>();
+
   const user = auth.currentUser;
 
   useEffect(() => {
@@ -56,14 +70,23 @@ const HomeScreen = () => {
 
     const travelsRef = collection(db, 'travels');
 
-    const q = query(travelsRef, orderBy('startDate', 'desc'));
+    const q = query(
+      travelsRef,
+      where('userId', '==', user.uid)
+    );
+
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const travelsData: Travel[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Travel[];
+
+      // 인덱스 오류 방지를 위해 메모리상에서 정렬
+      travelsData.sort((a, b) => b.startDate.localeCompare(a.startDate));
+
       setTravels(travelsData);
+
     }, (error) => {
       console.error('Firestore snapshot error:', error);
     });
@@ -72,8 +95,9 @@ const HomeScreen = () => {
   }, [user]);
 
   const createNewTravel = async () => {
-    if (!user) return;
+    if (!user || isCreating) return;
 
+    setIsCreating(true);
     try {
       const newTravel = {
         title: '새로운 여행',
@@ -85,15 +109,50 @@ const HomeScreen = () => {
       };
 
       await addDoc(collection(db, 'travels'), newTravel);
-
+      Alert.alert('알림', '새로운 여행이 생성되었습니다.');
     } catch (error) {
       console.error('Failed to create travel:', error);
       Alert.alert('오류', '새 여행 생성에 실패했습니다.');
+    } finally {
+      setIsCreating(false);
     }
   };
 
+  const deleteTravel = (id: string) => {
+    Alert.alert(
+      '여행 삭제',
+      '정말로 이 여행 기록을 삭제하시겠습니까? 관련 스토리북도 함께 삭제됩니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // 1. 관련 스토리북 모두 찾아서 삭제
+              const storybooksRef = collection(db, 'storybooks');
+              const q = query(storybooksRef, where('travelId', '==', id));
+              const querySnapshot = await getDocs(q);
+
+              const deletePromises = querySnapshot.docs.map(item => deleteDoc(item.ref));
+              await Promise.all(deletePromises);
+
+              // 2. 여행 기록 자체를 삭제
+              await deleteDoc(doc(db, 'travels', id));
+
+              Alert.alert('알림', '기록이 삭제되었습니다.');
+            } catch (error) {
+              console.error('Failed to delete travel:', error);
+              Alert.alert('오류', '삭제에 실패했습니다.');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   return (
+
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.logo}>Travel Story</Text>
@@ -111,19 +170,29 @@ const HomeScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={styles.createButton}
+          style={[styles.createButton, isCreating && styles.disabledButton]}
           onPress={createNewTravel}
-          activeOpacity={0.8}>
-          <Text style={styles.createButtonText}>+ 새 여행 만들기</Text>
+          activeOpacity={0.8}
+          disabled={isCreating}>
+          <Text style={styles.createButtonText}>
+            {isCreating ? '생성 중...' : '+ 새 여행 만들기'}
+          </Text>
         </TouchableOpacity>
+
 
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.cardsContainer}
           showsVerticalScrollIndicator={false}>
           {travels.map(travel => (
-            <TravelCard key={travel.id} travel={travel} onPress={() => navigation.navigate('DiaryWrite', { travelId: travel.id })} />
+            <TravelCard
+              key={travel.id}
+              travel={travel}
+              onPress={() => navigation.navigate('DiaryWrite', { travelId: travel.id })}
+              onDelete={deleteTravel}
+            />
           ))}
+
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -186,7 +255,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  disabledButton: {
+    backgroundColor: '#999999',
+  },
   scrollView: {
+
     flex: 1,
   },
   cardsContainer: {
@@ -195,12 +268,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 20,
   },
-  card: {
+  cardContainer: {
     width: '48%',
+    marginBottom: 16,
+    position: 'relative',
+  },
+
+  card: {
+    width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -210,6 +288,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+
   cardContent: {
     minHeight: 100,
     justifyContent: 'space-between',
@@ -239,6 +318,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666666',
   },
+  deleteIconButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF3B30',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+    elevation: 3,
+  },
+  deleteIconText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
 });
+
 
 export default HomeScreen;

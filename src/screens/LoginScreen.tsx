@@ -11,11 +11,11 @@ import {
   Alert,
 } from 'react-native';
 import { auth, WEB_CLIENT_ID } from '../config/firebase';
-import { 
-  signInAnonymously, 
-  GoogleAuthProvider, 
-  signInWithCredential, 
-  onAuthStateChanged 
+import {
+  signInAnonymously,
+  GoogleAuthProvider,
+  signInWithCredential,
+  onAuthStateChanged
 } from 'firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { theme } from '../styles/theme';
@@ -30,26 +30,13 @@ type LoginScreenProps = {
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
 
-  // Google Sign-In 설정 및 인증 상태 감지
+  // Google Sign-In 설정
   useEffect(() => {
-    // Google Sign-In 설정
     GoogleSignin.configure({
       webClientId: WEB_CLIENT_ID,
     });
+  }, []);
 
-    // 인증 상태 감지
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-    if (user) {
-      setLoading(false);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Home' }],
-      });
-    }
-  });
-
-    return unsubscribe;
-  }, [navigation]);
 
   const handleAnonymousLogin = async () => {
     setLoading(true);
@@ -69,10 +56,10 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     try {
       // Google Play Services 확인
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      
+
       // Google 로그인 시작
       const signInResult = await GoogleSignin.signIn();
-      
+
       // idToken 안전하게 추출
       const idToken = signInResult.data?.idToken;
 
